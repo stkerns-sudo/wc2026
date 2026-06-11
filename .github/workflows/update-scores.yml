@@ -1,0 +1,37 @@
+name: Update World Cup Scores
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-scores:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch standings from football-data.org
+        env:
+          FD_TOKEN: ${{ secrets.FD_TOKEN }}
+        run: |
+          curl -s \
+            -H "X-Auth-Token: $FD_TOKEN" \
+            "https://api.football-data.org/v4/competitions/WC/standings" \
+            -o standings_raw.json
+
+          curl -s \
+            -H "X-Auth-Token: $FD_TOKEN" \
+            "https://api.football-data.org/v4/competitions/WC/matches" \
+            -o matches_raw.json
+
+          python3 process_scores.py
+
+      - name: Commit and push scores.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scores.json
+          git diff --cached --quiet || git commit -m "Update scores $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
